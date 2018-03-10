@@ -18,8 +18,8 @@ public Action Command_Name(int client, int args) {
   if (!g_EditMode)
     return Plugin_Handled;
 
-  if (args >= 1 && GetCmdArgString(g_TempNameBuffer, sizeof(g_TempNameBuffer))) {
-    if (g_EditingExecutes) {
+  if (args >= 1 && GetCmdArgString(g_EditingNameBuffer[client], TEMP_NAME_LENGTH)) {
+    if (g_EditingExecutes[client]) {
       GiveNewExecuteMenu(client);
     } else {
       GiveNewSpawnMenu(client);
@@ -83,7 +83,7 @@ public Action Command_NextSpawn(int client, int args) {
     return Plugin_Handled;
   }
 
-  int spawn = g_EditingSpawnIndex + 1;
+  int spawn = g_EditingSpawnIndex[client] + 1;
   while (!IsValidSpawn(spawn) && spawn < MAX_SPAWNS) {
     spawn++;
   }
@@ -91,7 +91,7 @@ public Action Command_NextSpawn(int client, int args) {
   if (IsValidSpawn(spawn)) {
     EditSpawn(client, spawn);
   } else {
-    g_EditingSpawnIndex = 0;
+    g_EditingSpawnIndex[client] = 0;
   }
 
   return Plugin_Handled;

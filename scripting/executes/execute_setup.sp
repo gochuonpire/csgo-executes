@@ -704,9 +704,9 @@ stock void ThrowRoundNades(float timeUntilFreezeEnd = 5.0) {
 }
 
 stock void ThrowEditingNades(float timeUntilFreezeEnd, int client, bool optional) {
-  ThrowNades(timeUntilFreezeEnd, client, g_EditingExecuteTRequired);
+  ThrowNades(timeUntilFreezeEnd, client, g_EditingExecuteTRequired[client]);
   if (optional)
-    ThrowNades(timeUntilFreezeEnd, client, g_EditingExecuteTOptional);
+    ThrowNades(timeUntilFreezeEnd, client, g_EditingExecuteTOptional[client]);
 }
 
 static void ThrowNades(float timeUntilFreezeEnd, int client, ArrayList spawns) {
@@ -770,15 +770,15 @@ public int GetMinFreezetime(int execute) {
   return freezetime;
 }
 
-public int GetEditMinFreezetime() {
+public int GetEditMinFreezetime(int client) {
   int freezetime = 1;
 
-  int requiredTime = GetMinFreezetimeFromSpawns(g_EditingExecuteTRequired);
+  int requiredTime = GetMinFreezetimeFromSpawns(g_EditingExecuteTRequired[client]);
   if (requiredTime > freezetime) {
     freezetime = requiredTime;
   }
 
-  int optionalTime = GetMinFreezetimeFromSpawns(g_EditingExecuteTOptional);
+  int optionalTime = GetMinFreezetimeFromSpawns(g_EditingExecuteTOptional[client]);
   if (optionalTime > freezetime) {
     freezetime = optionalTime;
   }

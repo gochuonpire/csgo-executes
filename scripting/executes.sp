@@ -78,6 +78,7 @@ int g_RoundCount = 0;
 #define MAX_SPAWNS 512
 #define MAX_EXECUTES 64
 #define ID_LENGTH 16
+#define TEMP_NAME_LENGTH 128
 #define EXECUTE_NAME_LENGTH 64
 #define SPAWN_NAME_LENGTH 64
 
@@ -108,24 +109,31 @@ ArrayList g_SpawnExclusionRules[MAX_SPAWNS];  // Spawns excluded if this spawn i
 #define MAX_FRIENDLINESS 5
 
 // Generic name buffer
-char g_TempNameBuffer[128];
-bool g_EditingExecutes = false;  // if true, editing a spawm
+char g_EditingNameBuffer[MAXPLAYERS + 1][TEMP_NAME_LENGTH];
+bool g_EditingExecutes[MAXPLAYERS + 1];  // if true, editing a spawm
 
 // Buffers for spawn editing
-bool g_EditingASpawn = false;
-int g_EditingSpawnIndex = -1;
-int g_NextSpawnId = 0;
+bool g_EditingASpawn[MAXPLAYERS + 1] = false;
+int g_EditingSpawnIndex[MAXPLAYERS + 1];
+int g_NextSpawnId;
 
-int g_EditingSpawnTeam = CS_TEAM_T;
-GrenadeType g_EditingSpawnGrenadeType = GrenadeType_None;
-float g_EditingSpawnNadePoint[3];
-float g_EditingSpawnNadeVelocity[3];
-int g_EditingSpawnSiteFriendly[2] = {MIN_FRIENDLINESS, MIN_FRIENDLINESS};
-int g_EditingSpawnAwpFriendly = AVG_FRIENDLINESS;
-int g_EditingSpawnBombFriendly = AVG_FRIENDLINESS;
-int g_EditingSpawnLikelihood = AVG_FRIENDLINESS;
-int g_EditingSpawnThrowTime;
-int g_EditingSpawnFlags;
+//int g_EditingSpawnTeam = CS_TEAM_T;
+//GrenadeType g_EditingSpawnGrenadeType = GrenadeType_None;
+//float g_EditingSpawnNadePoint[3];
+//float g_EditingSpawnNadeVelocity[3];
+
+
+int g_EditingSpawnTeam[MAXPLAYERS + 1];
+GrenadeType g_EditingSpawnGrenadeType[MAXPLAYERS + 1];
+float g_EditingSpawnNadePoint[MAXPLAYERS + 1][3];
+float g_EditingSpawnNadeVelocity[MAXPLAYERS + 1][3];
+
+int g_EditingSpawnSiteFriendly[MAXPLAYERS + 1][2];
+int g_EditingSpawnAwpFriendly[MAXPLAYERS + 1];
+int g_EditingSpawnBombFriendly[MAXPLAYERS + 1];
+int g_EditingSpawnLikelihood[MAXPLAYERS + 1];
+int g_EditingSpawnThrowTime[MAXPLAYERS + 1];
+int g_EditingSpawnFlags[MAXPLAYERS + 1];
 
 // Execute data
 int g_SelectedExecute = 0;
@@ -145,17 +153,17 @@ bool g_ExecuteFake[MAX_EXECUTES];
 float g_ExecuteExtraFreezeTime[MAX_EXECUTES];
 
 // Buffers for execute ediitng
-bool g_EditingAnExecute = false;
-int g_EditingExecuteIndex = -1;
+bool g_EditingAnExecute[MAXPLAYERS + 1];
+int g_EditingExecuteIndex[MAXPLAYERS + 1];
 
-int g_NextExecuteId = 0;
-Bombsite g_EditingExecuteSite = BombsiteA;
-ArrayList g_EditingExecuteTRequired = null;
-ArrayList g_EditingExecuteTOptional = null;
-int g_EditingExecuteLikelihood = AVG_FRIENDLINESS;
-char g_EditingExecuteForceBombId[ID_LENGTH];
-bool g_EditingExecuteStratTypes[3];
-bool g_EditingExecuteFake;
+int g_NextExecuteId;
+Bombsite g_EditingExecuteSite[MAXPLAYERS + 1];
+ArrayList g_EditingExecuteTRequired[MAXPLAYERS + 1];
+ArrayList g_EditingExecuteTOptional[MAXPLAYERS + 1];
+int g_EditingExecuteLikelihood[MAXPLAYERS + 1];
+char g_EditingExecuteForceBombId[MAXPLAYERS + 1][ID_LENGTH];
+bool g_EditingExecuteStratTypes[MAXPLAYERS + 1][3];
+bool g_EditingExecuteFake[MAXPLAYERS + 1];
 
 /** Data created for the current scenario **/
 Bombsite g_Bombsite;
@@ -326,8 +334,11 @@ public void OnPluginStart() {
   g_hWaitingQueue = Queue_Init();
   g_hRankingQueue = PQ_Init();
 
-  g_EditingExecuteTRequired = new ArrayList(ID_LENGTH);
-  g_EditingExecuteTOptional = new ArrayList(ID_LENGTH);
+  for (int i = 1; i <= MaxClients; i++) {
+    g_EditingExecuteTRequired[i] = new ArrayList(ID_LENGTH);
+    g_EditingExecuteTOptional[i] = new ArrayList(ID_LENGTH);
+  }
+
   for (int i = 0; i < MAX_EXECUTES; i++) {
     g_ExecuteTSpawnsOptional[i] = new ArrayList(ID_LENGTH);
     g_ExecuteTSpawnsRequired[i] = new ArrayList(ID_LENGTH);
@@ -357,11 +368,12 @@ public void OnMapStart() {
   g_RoundCount = 0;
   g_RoundSpawnsDecided = false;
 
+  ClearAllEditBuffers();
+
   ReadMapConfig();
 
-  g_EditingSpawnThrowTime = DEFAULT_THROWTIME;
   g_EditMode = false;
-  ClearEditBuffers();
+
   ServerCommand("sv_infinite_ammo 0");
 
   CreateTimer(1.0, Timer_ShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
@@ -436,10 +448,19 @@ public void OnClientConnected(int client) {
   if (GetActivePlayerCount() < g_hMinPlayers.IntValue) {
     EnsurePausedWarmup();
   }
+
+  if (g_EditMode) {
+    ResetEditingClientVariables(client);
+  }
 }
 
 public void OnClientDisconnect(int client) {
   ResetClientVariables(client);
+  
+  if(g_EditMode) {
+    ResetEditingClientVariables(client);
+  }
+
   CheckRoundDone();
 }
 
@@ -460,6 +481,13 @@ public void ResetClientVariables(int client) {
   g_LastTeam[client] = CS_TEAM_T;
   g_SitePreference[client] = SitePref_None;
   g_LastItemPickup[client] = "";
+}
+
+/**
+ * Reset Client variables for editing
+ */
+public void ResetEditingClientVariables(int client) {
+  ClearEditBuffers(client);
 }
 
 public Action Command_ScrambleTeams(int client, int args) {

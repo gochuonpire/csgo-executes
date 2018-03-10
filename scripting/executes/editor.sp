@@ -13,10 +13,6 @@ public void StartEditMode() {
 
   Executes_MessageToAll("Edit mode launched, type !edit to open the edit menu");
 
-  g_EditingExecutes = false;
-  g_EditingASpawn = false;
-  g_EditingAnExecute = false;
-
   if (LibraryExists("practicemode")) {
     PM_StartPracticeMode();
   }
@@ -44,12 +40,12 @@ public void CSU_OnThrowGrenade(int client, int entity, GrenadeType grenadeType, 
                         const float velocity[3]) {
   LogDebug("CSU_OnThrowGrenade %L %d", client, grenadeType);
   if (g_EditMode && CheckCommandAccess(client, "sm_edit", ADMFLAG_CHANGEMAP)) {
-    g_EditingSpawnGrenadeType = grenadeType;
-    g_EditingSpawnNadePoint = origin;
-    g_EditingSpawnNadeVelocity = velocity;
+    g_EditingSpawnGrenadeType[client] = grenadeType;
+    g_EditingSpawnNadePoint[client] = origin;
+    g_EditingSpawnNadeVelocity[client] = velocity;
 
     // TODO: add a way to disable this
-    if (!g_EditingExecutes) {
+    if (!g_EditingExecutes[client]) {
       GiveNewSpawnMenu(client);
     }
   }
@@ -131,10 +127,6 @@ stock bool SpawnFilter(int spawn) {
     return false;
   }
 
-  // if (g_SpawnSites[spawn] != g_EditingSite) {
-  //     return false;
-  // }
-
   return true;
 }
 
@@ -148,63 +140,78 @@ stock void AddSpawn(int client) {
   }
 
   int spawnIndex = g_NumSpawns;
-  if (g_EditingASpawn) {
-    spawnIndex = g_EditingSpawnIndex;
+  if (g_EditingASpawn[client]) {
+    spawnIndex = g_EditingSpawnIndex[client];
   }
 
-  strcopy(g_SpawnNames[spawnIndex], SPAWN_NAME_LENGTH, g_TempNameBuffer);
+  strcopy(g_SpawnNames[spawnIndex], SPAWN_NAME_LENGTH, g_EditingNameBuffer[client]);
 
-  if (!g_EditingASpawn) {
+  if (!g_EditingASpawn[client]) {
     IntToString(g_NextSpawnId, g_SpawnIDs[spawnIndex], ID_LENGTH);
     g_NextSpawnId++;
   }
 
   GetClientAbsOrigin(client, g_SpawnPoints[spawnIndex]);
   GetClientEyeAngles(client, g_SpawnAngles[spawnIndex]);
-  g_SpawnTeams[spawnIndex] = g_EditingSpawnTeam;
-  g_SpawnGrenadeTypes[spawnIndex] = g_EditingSpawnGrenadeType;
+  g_SpawnTeams[spawnIndex] = g_EditingSpawnTeam[client];
+  g_SpawnGrenadeTypes[spawnIndex] = g_EditingSpawnGrenadeType[client];
 
-  g_SpawnNadePoints[spawnIndex] = g_EditingSpawnNadePoint;
-  g_SpawnNadeVelocities[spawnIndex] = g_EditingSpawnNadeVelocity;
-  g_SpawnSiteFriendly[spawnIndex] = g_EditingSpawnSiteFriendly;
-  g_SpawnAwpFriendly[spawnIndex] = g_EditingSpawnAwpFriendly;
-  g_SpawnBombFriendly[spawnIndex] = g_EditingSpawnBombFriendly;
-  g_SpawnLikelihood[spawnIndex] = g_EditingSpawnLikelihood;
-  g_SpawnGrenadeThrowTimes[spawnIndex] = g_EditingSpawnThrowTime;
-  g_SpawnFlags[spawnIndex] = g_EditingSpawnFlags;
+  g_SpawnNadePoints[spawnIndex] = g_EditingSpawnNadePoint[client];
+  g_SpawnNadeVelocities[spawnIndex] = g_EditingSpawnNadeVelocity[client];
+  g_SpawnSiteFriendly[spawnIndex] = g_EditingSpawnSiteFriendly[client];
+  g_SpawnAwpFriendly[spawnIndex] = g_EditingSpawnAwpFriendly[client];
+  g_SpawnBombFriendly[spawnIndex] = g_EditingSpawnBombFriendly[client];
+  g_SpawnLikelihood[spawnIndex] = g_EditingSpawnLikelihood[client];
+  g_SpawnGrenadeThrowTimes[spawnIndex] = g_EditingSpawnThrowTime[client];
+  g_SpawnFlags[spawnIndex] = g_EditingSpawnFlags[client];
 
   g_SpawnDeleted[spawnIndex] = false;
-  ClearSpawnBuffers();
+  ClearSpawnBuffers(client);
 
-  if (!g_EditingASpawn) {
-    Executes_MessageToAll("Added %s spawn (id:%s).", TEAMSTRING(g_EditingSpawnTeam),
+  if (!g_EditingASpawn[client]) {
+    Executes_MessageToAll("Added %s spawn (id:%s).", TEAMSTRING(g_EditingSpawnTeam[client]),
                           g_SpawnIDs[spawnIndex]);
 
     g_NumSpawns++;
   } else {
-    Executes_MessageToAll("Edited %s spawn (id:%s).", TEAMSTRING(g_EditingSpawnTeam),
+    Executes_MessageToAll("Edited %s spawn (id:%s).", TEAMSTRING(g_EditingSpawnTeam[client]),
                           g_SpawnIDs[spawnIndex]);
   }
 
-  g_EditingASpawn = false;
-  g_EditingSpawnThrowTime = DEFAULT_THROWTIME;
-  g_EditingSpawnFlags = 0;
-  g_EditingSpawnGrenadeType = GrenadeType_None;
+  g_EditingASpawn[client] = false;
+  g_EditingSpawnThrowTime[client] = DEFAULT_THROWTIME;
+  g_EditingSpawnFlags[client] = 0;
+  g_EditingSpawnGrenadeType[client] = GrenadeType_None;
 }
 
-public void ClearSpawnBuffers() {
-  Format(g_TempNameBuffer, sizeof(g_TempNameBuffer), "");
+public void ClearSpawnBuffers(int client) {
+  Format(g_EditingNameBuffer[client], TEMP_NAME_LENGTH, "");
+  g_EditingASpawn[client] = false;
+  g_EditingSpawnIndex[client] = -1;
+  g_EditingSpawnTeam[client] = CS_TEAM_T;
+  g_EditingSpawnGrenadeType[client] = GrenadeType_None;
+  g_EditingSpawnSiteFriendly[client] = {MIN_FRIENDLINESS, MIN_FRIENDLINESS};
+  g_EditingSpawnAwpFriendly[client] = AVG_FRIENDLINESS;
+  g_EditingSpawnBombFriendly[client] = AVG_FRIENDLINESS;
+  g_EditingSpawnLikelihood[client] = AVG_FRIENDLINESS;
 }
 
-public void ClearExecuteBuffers() {
-  Format(g_EditingExecuteForceBombId, sizeof(g_EditingExecuteForceBombId), "");
-  Format(g_TempNameBuffer, sizeof(g_TempNameBuffer), "");
-  g_EditingExecuteTRequired.Clear();
-  g_EditingExecuteTOptional.Clear();
-  g_EditingExecuteStratTypes[StratType_Normal] = true;
-  g_EditingExecuteStratTypes[StratType_Pistol] = false;
-  g_EditingExecuteStratTypes[StratType_ForceBuy] = false;
-  g_EditingExecuteFake = false;
+public void ClearExecuteBuffers(int client) {
+  Format(g_EditingExecuteForceBombId[client], 16, "");
+  Format(g_EditingNameBuffer[client], TEMP_NAME_LENGTH, "");
+  g_EditingExecuteTRequired[client] = new ArrayList(ID_LENGTH);
+  g_EditingExecuteTOptional[client] = new ArrayList(ID_LENGTH);
+  g_EditingExecuteStratTypes[client][StratType_Normal] = true;
+  g_EditingExecuteStratTypes[client][StratType_Pistol] = false;
+  g_EditingExecuteStratTypes[client][StratType_ForceBuy] = false;
+  g_EditingExecuteFake[client] = false;
+}
+
+public void ClearAllEditBuffers() {
+  for (int i = 1; i <= MaxClients; i++) {
+    ClearExecuteBuffers(i);
+    ClearEditBuffers(i);
+  }
 }
 
 public void AddExecute(int client) {
@@ -217,43 +224,43 @@ public void AddExecute(int client) {
   }
 
   int execIndex = g_NumExecutes;
-  if (g_EditingAnExecute) {
-    execIndex = g_EditingExecuteIndex;
+  if (g_EditingAnExecute[client]) {
+    execIndex = g_EditingExecuteIndex[client];
   }
 
-  strcopy(g_ExecuteNames[execIndex], EXECUTE_NAME_LENGTH, g_TempNameBuffer);
+  strcopy(g_ExecuteNames[execIndex], EXECUTE_NAME_LENGTH, g_EditingNameBuffer[client]);
 
-  if (!g_EditingAnExecute) {
+  if (!g_EditingAnExecute[client]) {
     IntToString(g_NextExecuteId, g_ExecuteIDs[execIndex], ID_LENGTH);
     g_NextExecuteId++;
   }
 
   g_ExecuteLikelihood[execIndex] = AVG_FRIENDLINESS;
-  g_ExecuteSites[execIndex] = g_EditingExecuteSite;
+  g_ExecuteSites[execIndex] = g_EditingExecuteSite[client];
   g_ExecuteDeleted[execIndex] = false;
-  g_ExecuteLikelihood[execIndex] = g_EditingExecuteLikelihood;
-  strcopy(g_ExecuteForceBombId[execIndex], ID_LENGTH, g_EditingExecuteForceBombId);
+  g_ExecuteLikelihood[execIndex] = g_EditingExecuteLikelihood[client];
+  strcopy(g_ExecuteForceBombId[execIndex], ID_LENGTH, g_EditingExecuteForceBombId[client]);
 
   g_ExecuteTSpawnsRequired[execIndex].Clear();
   g_ExecuteTSpawnsOptional[execIndex].Clear();
-  CopyList(g_EditingExecuteTRequired, g_ExecuteTSpawnsRequired[execIndex]);
-  CopyList(g_EditingExecuteTOptional, g_ExecuteTSpawnsOptional[execIndex]);
-  g_ExecuteStratTypes[execIndex] = g_EditingExecuteStratTypes;
-  g_ExecuteFake[execIndex] = g_EditingExecuteFake;
+  CopyList(g_EditingExecuteTRequired[client], g_ExecuteTSpawnsRequired[execIndex]);
+  CopyList(g_EditingExecuteTOptional[client], g_ExecuteTSpawnsOptional[execIndex]);
+  g_ExecuteStratTypes[execIndex] = g_EditingExecuteStratTypes[client];
+  g_ExecuteFake[execIndex] = g_EditingExecuteFake[client];
 
-  ClearExecuteBuffers();
+  ClearExecuteBuffers(client);
 
-  if (!g_EditingAnExecute) {
-    Executes_MessageToAll("Added %s execute (id:%s).", SITESTRING(g_EditingExecuteSite),
+  if (!g_EditingAnExecute[client]) {
+    Executes_MessageToAll("Added %s execute (id:%s).", SITESTRING(g_EditingExecuteSite[client]),
                           g_ExecuteIDs[execIndex]);
     g_NumExecutes++;
   } else {
-    Executes_MessageToAll("Edited %s execute (id:%s).", SITESTRING(g_EditingExecuteSite),
+    Executes_MessageToAll("Edited %s execute (id:%s).", SITESTRING(g_EditingExecuteSite[client]),
                           g_ExecuteIDs[execIndex]);
   }
 
-  g_EditingAnExecute = false;
-  g_EditingExecuteLikelihood = AVG_FRIENDLINESS;
+  g_EditingAnExecute[client] = false;
+  g_EditingExecuteLikelihood[client] = AVG_FRIENDLINESS;
 }
 
 public void DisplaySpawnPoint(int client, const float position[3], const float angles[3], float size,
@@ -401,14 +408,19 @@ public void GrenadeTypeName(GrenadeType grenadeType, char[] buf, int len) {
 }
 
 public Action Command_ClearBuffers(int client, int args) {
-  ClearEditBuffers();
+  ClearEditBuffers(client);
+  char clientName[MAX_NAME_LENGTH];
+  char finalMsg[1024];
+  GetClientName(client, clientName, sizeof(clientName));
+  Format(finalMsg, sizeof(finalMsg), "%s %s", "Cleared edit buffers for", clientName);
+  Executes_MessageToAll(finalMsg);
   return Plugin_Handled;
 }
 
-public void ClearEditBuffers() {
-  g_EditingSpawnGrenadeType = GrenadeType_None;
-  ClearSpawnBuffers();
-  ClearExecuteBuffers();
+public void ClearEditBuffers(int client) {
+  g_EditingSpawnGrenadeType[client] = GrenadeType_None;
+  ClearExecuteBuffers(client);
+  ClearSpawnBuffers(client);
 }
 
 public Action Command_ExecuteDistribution(int client, int args) {

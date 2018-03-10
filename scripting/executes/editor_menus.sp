@@ -41,11 +41,11 @@ public int EditorMenuHandler(Menu menu, MenuAction action, int param1, int param
       ExitEditMode();
 
     } else if (StrEqual(choice, "add_spawn")) {
-      g_EditingASpawn = false;
+      g_EditingASpawn[client] = false;
       GiveNewSpawnMenu(client);
 
     } else if (StrEqual(choice, "add_execute")) {
-      g_EditingAnExecute = false;
+      g_EditingAnExecute[client] = false;
       GiveNewExecuteMenu(client);
 
     } else if (StrEqual(choice, "edit_spawn")) {
@@ -60,7 +60,7 @@ public int EditorMenuHandler(Menu menu, MenuAction action, int param1, int param
       GiveEditorMenu(client, menuPosition);
 
     } else if (StrEqual(choice, "edit_execute")) {
-      // ClearExecuteBuffers
+      ClearExecuteBuffers(client);
       GiveExecuteEditMenu(client);
 
     } else if (StrEqual(choice, "save_map_data")) {
@@ -72,9 +72,13 @@ public int EditorMenuHandler(Menu menu, MenuAction action, int param1, int param
       GiveEditorMenu(client, menuPosition);
 
     } else if (StrEqual(choice, "clear_edit_buffers")) {
-      ClearEditBuffers();
+      ClearEditBuffers(client);
+      char clientName[MAX_NAME_LENGTH];
+      char finalMsg[1024];
+      GetClientName(client, clientName, sizeof(clientName));
+      Format(finalMsg, sizeof(finalMsg), "%s %s", "Cleared edit buffers for", clientName);
+      Executes_MessageToAll(finalMsg);
       GiveEditorMenu(client, menuPosition);
-
     } else {
       LogError("unknown menu info string = %s", choice);
     }
@@ -84,35 +88,35 @@ public int EditorMenuHandler(Menu menu, MenuAction action, int param1, int param
 }
 
 stock void GiveNewSpawnMenu(int client, int pos = -1) {
-  g_EditingExecutes = false;
+  g_EditingExecutes[client] = false;
   Menu menu = new Menu(GiveNewSpawnMenuHandler);
   menu.SetTitle("Add a spawn");
 
-  if (StrEqual(g_TempNameBuffer, ""))
+  if (StrEqual(g_EditingNameBuffer[client], ""))
     AddMenuOptionDisabled(menu, "finish", "Finish spawn (use !setname to name first)");
   else
-    AddMenuOption(menu, "finish", "Finish spawn (%s)", g_TempNameBuffer);
+    AddMenuOption(menu, "finish", "Finish spawn (%s)", g_EditingNameBuffer[client]);
 
-  AddMenuOption(menu, "team", "Team: %s", TEAMSTRING(g_EditingSpawnTeam));
-  if (g_EditingSpawnTeam == CS_TEAM_CT) {
+  AddMenuOption(menu, "team", "Team: %s", TEAMSTRING(g_EditingSpawnTeam[client]));
+  if (g_EditingSpawnTeam[client] == CS_TEAM_CT) {
     AddMenuOption(menu, "a_friendly", "A site friendliness: %d",
-                  g_EditingSpawnSiteFriendly[BombsiteA]);
+                  g_EditingSpawnSiteFriendly[client][BombsiteA]);
     AddMenuOption(menu, "b_friendly", "B site friendliness: %d",
-                  g_EditingSpawnSiteFriendly[BombsiteB]);
-    AddMenuOption(menu, "awp_friendly", "AWP friendliness: %d", g_EditingSpawnAwpFriendly);
-    AddMenuOption(menu, "likelihood", "Likelihood value: %d", g_EditingSpawnLikelihood);
+                  g_EditingSpawnSiteFriendly[client][BombsiteB]);
+    AddMenuOption(menu, "awp_friendly", "AWP friendliness: %d", g_EditingSpawnAwpFriendly[client]);
+    AddMenuOption(menu, "likelihood", "Likelihood value: %d", g_EditingSpawnLikelihood[client]);
   } else {
     AddMenuOption(menu, "bomb_friendly", "Bomb carrier friendliness: %d",
-                  g_EditingSpawnBombFriendly);
-    AddMenuOption(menu, "awp_friendly", "AWP friendliness: %d", g_EditingSpawnAwpFriendly);
+                  g_EditingSpawnBombFriendly[client]);
+    AddMenuOption(menu, "awp_friendly", "AWP friendliness: %d", g_EditingSpawnAwpFriendly[client]);
 
     char type[32];
-    GrenadeTypeName(g_EditingSpawnGrenadeType, type, sizeof(type));
+    GrenadeTypeName(g_EditingSpawnGrenadeType[client], type, sizeof(type));
     AddMenuOptionDisabled(menu, "x", "Grenade: %s", type);
 
     char throwTime[32];
-    ThrowTimeString(g_EditingSpawnThrowTime, throwTime, sizeof(throwTime));
-    if (IsGrenade(g_EditingSpawnGrenadeType)) {
+    ThrowTimeString(g_EditingSpawnThrowTime[client], throwTime, sizeof(throwTime));
+    if (IsGrenade(g_EditingSpawnGrenadeType[client])) {
       AddMenuOption(menu, "grenade_throw_time", "Throw Grenade: %s", throwTime);
     } else {
       AddMenuOptionDisabled(menu, "grenade_throw_time", "Throw Grenade: %s", throwTime);
@@ -142,34 +146,34 @@ public int GiveNewSpawnMenuHandler(Menu menu, MenuAction action, int param1, int
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "team")) {
-      g_EditingSpawnTeam = GetOtherTeam(g_EditingSpawnTeam);
+      g_EditingSpawnTeam[client] = GetOtherTeam(g_EditingSpawnTeam[client]);
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "name")) {
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "a_friendly")) {
-      IncSiteFriendly(BombsiteA);
+      IncSiteFriendly(client, BombsiteA);
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "b_friendly")) {
-      IncSiteFriendly(BombsiteB);
+      IncSiteFriendly(client, BombsiteB);
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "awp_friendly")) {
-      IncAwpFriendly();
+      IncAwpFriendly(client);
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "bomb_friendly")) {
-      IncBombFriendly();
+      IncBombFriendly(client);
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "likelihood")) {
-      IncSpawnLikelihood();
+      IncSpawnLikelihood(client);
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "grenade_throw_time")) {
-      IncThrowTime();
+      IncThrowTime(client);
       GiveNewSpawnMenu(client, pos);
 
     } else if (StrEqual(choice, "flags")) {
@@ -186,38 +190,38 @@ public int GiveNewSpawnMenuHandler(Menu menu, MenuAction action, int param1, int
   }
 }
 
-public void IncSiteFriendly(Bombsite site) {
-  g_EditingSpawnSiteFriendly[site]++;
-  if (g_EditingSpawnSiteFriendly[site] > MAX_FRIENDLINESS) {
-    g_EditingSpawnSiteFriendly[site] = MIN_FRIENDLINESS;
+public void IncSiteFriendly(int client, Bombsite site) {
+  g_EditingSpawnSiteFriendly[client][site]++;
+  if (g_EditingSpawnSiteFriendly[client][site] > MAX_FRIENDLINESS) {
+    g_EditingSpawnSiteFriendly[client][site] = MIN_FRIENDLINESS;
   }
 }
 
-public void IncAwpFriendly() {
-  g_EditingSpawnAwpFriendly++;
-  if (g_EditingSpawnAwpFriendly > MAX_FRIENDLINESS) {
-    g_EditingSpawnAwpFriendly = MIN_FRIENDLINESS;
+public void IncAwpFriendly(int client) {
+  g_EditingSpawnAwpFriendly[client]++;
+  if (g_EditingSpawnAwpFriendly[client] > MAX_FRIENDLINESS) {
+    g_EditingSpawnAwpFriendly[client] = MIN_FRIENDLINESS;
   }
 }
 
-public void IncBombFriendly() {
-  g_EditingSpawnBombFriendly++;
-  if (g_EditingSpawnBombFriendly > MAX_FRIENDLINESS) {
-    g_EditingSpawnBombFriendly = MIN_FRIENDLINESS;
+public void IncBombFriendly(int client) {
+  g_EditingSpawnBombFriendly[client]++;
+  if (g_EditingSpawnBombFriendly[client] > MAX_FRIENDLINESS) {
+    g_EditingSpawnBombFriendly[client] = MIN_FRIENDLINESS;
   }
 }
 
-public void IncSpawnLikelihood() {
-  g_EditingSpawnLikelihood++;
-  if (g_EditingSpawnLikelihood > MAX_FRIENDLINESS) {
-    g_EditingSpawnLikelihood = MIN_FRIENDLINESS;
+public void IncSpawnLikelihood(int client) {
+  g_EditingSpawnLikelihood[client]++;
+  if (g_EditingSpawnLikelihood[client] > MAX_FRIENDLINESS) {
+    g_EditingSpawnLikelihood[client] = MIN_FRIENDLINESS;
   }
 }
 
-public void IncExecuteLikelihood() {
-  g_EditingExecuteLikelihood++;
-  if (g_EditingExecuteLikelihood > MAX_FRIENDLINESS) {
-    g_EditingExecuteLikelihood = MIN_FRIENDLINESS;
+public void IncExecuteLikelihood(int client) {
+  g_EditingExecuteLikelihood[client]++;
+  if (g_EditingExecuteLikelihood[client] > MAX_FRIENDLINESS) {
+    g_EditingExecuteLikelihood[client] = MIN_FRIENDLINESS;
   }
 }
 
@@ -231,49 +235,49 @@ public void ThrowTimeString(int time, char[] buf, int len) {
   }
 }
 
-public void IncThrowTime() {
-  g_EditingSpawnThrowTime++;
-  if (g_EditingSpawnThrowTime > 5) {
-    g_EditingSpawnThrowTime = 0;
+public void IncThrowTime(int client) {
+  g_EditingSpawnThrowTime[client]++;
+  if (g_EditingSpawnThrowTime[client] > 5) {
+    g_EditingSpawnThrowTime[client] = 0;
   }
 }
 
 stock void GiveNewExecuteMenu(int client, int pos = -1) {
-  g_EditingExecutes = true;
+  g_EditingExecutes[client] = true;
   Menu menu = new Menu(GiveNewExecuteMenuHandler);
-  if (g_EditingAnExecute)
+  if (g_EditingAnExecute[client])
     menu.SetTitle("Edit an execute");
   else
     menu.SetTitle("Add an execute");
 
-  if (StrEqual(g_TempNameBuffer, ""))
+  if (StrEqual(g_EditingNameBuffer[client], ""))
     AddMenuOptionDisabled(menu, "finish", "Finish execute (use !setname to name it first)");
   else
-    AddMenuOption(menu, "finish", "finish execute (%s)", g_TempNameBuffer);
+    AddMenuOption(menu, "finish", "finish execute (%s)", g_EditingNameBuffer[client]);
 
-  AddMenuOption(menu, "site", "Site: %s", SITESTRING(g_EditingExecuteSite));
+  AddMenuOption(menu, "site", "Site: %s", SITESTRING(g_EditingExecuteSite[client]));
   AddMenuOption(menu, "t_spawns", "Edit T spawns");
 
   AddMenuOption(menu, "play_required_nades", "Play required nades");
   AddMenuOption(menu, "play_all_nades", "Play all nades");
-  AddMenuOption(menu, "likelihood", "Likelihood value: %d", g_EditingExecuteLikelihood);
+  AddMenuOption(menu, "likelihood", "Likelihood value: %d", g_EditingExecuteLikelihood[client]);
 
   AddMenuOption(menu, "strat_normal", "Gun round strat: %d",
-                g_EditingExecuteStratTypes[StratType_Normal]);
+                g_EditingExecuteStratTypes[client][StratType_Normal]);
   AddMenuOption(menu, "strat_pistol", "Pistol round strat: %d",
-                g_EditingExecuteStratTypes[StratType_Pistol]);
+                g_EditingExecuteStratTypes[client][StratType_Pistol]);
   AddMenuOption(menu, "strat_force", "Force round strat: %d",
-                g_EditingExecuteStratTypes[StratType_ForceBuy]);
-  AddMenuOption(menu, "fake", "Is a fake: %s", g_EditingExecuteFake ? "yes" : "no");
+                g_EditingExecuteStratTypes[client][StratType_ForceBuy]);
+  AddMenuOption(menu, "fake", "Is a fake: %s", g_EditingExecuteFake[client] ? "yes" : "no");
 
-  if (IsValidSpawn(SpawnIdToIndex(g_EditingExecuteForceBombId))) {
+  if (IsValidSpawn(SpawnIdToIndex(g_EditingExecuteForceBombId[client]))) {
     AddMenuOption(menu, "forcebomb_id", "Forced bomb spawn: %s",
-                  g_SpawnNames[SpawnIdToIndex(g_EditingExecuteForceBombId)]);
+                  g_SpawnNames[SpawnIdToIndex(g_EditingExecuteForceBombId[client])]);
   } else {
     AddMenuOption(menu, "forcebomb_id", "Forced bomb spawn: none");
   }
 
-  if (g_EditingAnExecute)
+  if (g_EditingAnExecute[client])
     AddMenuOption(menu, "delete", "Delete this execute");
 
   menu.ExitButton = true;
@@ -289,9 +293,9 @@ stock void GiveNewExecuteMenu(int client, int pos = -1) {
 public int GiveNewExecuteMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
   if (action == MenuAction_Select) {
     int pos = GetMenuSelectionPosition();
-    int freezetime = GetEditMinFreezetime();
 
     int client = param1;
+    int freezetime = GetEditMinFreezetime(client);
     char choice[64];
     GetMenuItem(menu, param2, choice, sizeof(choice));
     if (StrEqual(choice, "finish")) {
@@ -299,11 +303,11 @@ public int GiveNewExecuteMenuHandler(Menu menu, MenuAction action, int param1, i
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "delete")) {
-      g_ExecuteDeleted[g_EditingExecuteIndex] = true;
+      g_ExecuteDeleted[g_EditingExecuteIndex[client]] = true;
       GiveEditorMenu(client);
 
     } else if (StrEqual(choice, "site")) {
-      g_EditingExecuteSite = GetOtherSite(g_EditingExecuteSite);
+      g_EditingExecuteSite[client] = GetOtherSite(g_EditingExecuteSite[client]);
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "name")) {
@@ -321,23 +325,23 @@ public int GiveNewExecuteMenuHandler(Menu menu, MenuAction action, int param1, i
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "likelihood")) {
-      IncExecuteLikelihood();
+      IncExecuteLikelihood(client);
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "strat_normal")) {
-      FlipStratType(StratType_Normal);
+      FlipStratType(client, StratType_Normal);
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "strat_pistol")) {
-      FlipStratType(StratType_Pistol);
+      FlipStratType(client, StratType_Pistol);
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "strat_force")) {
-      FlipStratType(StratType_ForceBuy);
+      FlipStratType(client, StratType_ForceBuy);
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "fake")) {
-      g_EditingExecuteFake = !g_EditingExecuteFake;
+      g_EditingExecuteFake[client] = !g_EditingExecuteFake[client];
       GiveNewExecuteMenu(client, pos);
 
     } else if (StrEqual(choice, "forcebomb_id")) {
@@ -349,23 +353,23 @@ public int GiveNewExecuteMenuHandler(Menu menu, MenuAction action, int param1, i
   } else if (action == MenuAction_Cancel && param2 == MenuCancel_ExitBack) {
     int client = param1;
     GiveEditorMenu(client);
-    g_EditingAnExecute = false;
+    g_EditingAnExecute[client] = false;
   } else if (action == MenuAction_End) {
     delete menu;
   }
 }
 
-static void FlipStratType(StratType type) {
-  g_EditingExecuteStratTypes[type] = !g_EditingExecuteStratTypes[type];
+static void FlipStratType(int client, StratType type) {
+  g_EditingExecuteStratTypes[client][type] = !g_EditingExecuteStratTypes[client][type];
 }
 
 public void GiveForceBombSpawneMenu(int client) {
   Menu menu = new Menu(GiveForceBombSpawneMenuHandler);
   menu.SetTitle("Select spawn to force bomb to");
 
-  for (int i = 0; i < g_EditingExecuteTRequired.Length; i++) {
+  for (int i = 0; i < g_EditingExecuteTRequired[client].Length; i++) {
     char id[ID_LENGTH];
-    g_EditingExecuteTRequired.GetString(i, id, sizeof(id));
+    g_EditingExecuteTRequired[client].GetString(i, id, sizeof(id));
     int idx = SpawnIdToIndex(id);
     if (IsValidSpawn(idx))
       AddMenuOption(menu, id, g_SpawnNames[idx]);
@@ -379,7 +383,7 @@ public void GiveForceBombSpawneMenu(int client) {
 public int GiveForceBombSpawneMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
   if (action == MenuAction_Select) {
     int client = param1;
-    GetMenuItem(menu, param2, g_EditingExecuteForceBombId, ID_LENGTH);
+    GetMenuItem(menu, param2, g_EditingExecuteForceBombId[client], ID_LENGTH);
     GiveNewExecuteMenu(client);
 
   } else if (action == MenuAction_Cancel && param2 == MenuCancel_ExitBack) {
@@ -391,10 +395,10 @@ public int GiveForceBombSpawneMenuHandler(Menu menu, MenuAction action, int para
   }
 }
 
-static ArrayList GetSpawnList(bool required, int execute = -1) {
+static ArrayList GetSpawnList(int client, bool required, int execute = -1) {
   // Use temp buffers lists
   if (execute == -1) {
-    return required ? g_EditingExecuteTRequired : g_EditingExecuteTOptional;
+    return required ? g_EditingExecuteTRequired[client] : g_EditingExecuteTOptional[client];
   }
 
   return required ? g_ExecuteTSpawnsRequired[execute] : g_ExecuteTSpawnsOptional[execute];
@@ -417,10 +421,10 @@ stock void GiveExecuteSpawnsMenu(int client, int menuPosition = -1) {
 
     int useId = 0;
     char usedStr[32] = "not used";
-    if (GetSpawnList(true).FindString(g_SpawnIDs[i]) >= 0) {
+    if (GetSpawnList(client, true).FindString(g_SpawnIDs[i]) >= 0) {
       useId = 1;
       usedStr = "required";
-    } else if (GetSpawnList(false).FindString(g_SpawnIDs[i]) >= 0) {
+    } else if (GetSpawnList(client, false).FindString(g_SpawnIDs[i]) >= 0) {
       useId = 2;
       usedStr = "optional";
     }
@@ -464,17 +468,17 @@ public int GiveExecuteSpawnsMenuHandler(Menu menu, MenuAction action, int param1
 
     if (useId == 0) {
       // not in use, make required
-      SetSpawnStatus(id, Spawn_Required, GetSpawnList(true), GetSpawnList(false));
+      SetSpawnStatus(id, Spawn_Required, GetSpawnList(client, true), GetSpawnList(client, false));
       Executes_MessageToAll("Added spawn \"%s\" to execute.", g_SpawnNames[index]);
 
     } else if (useId == 1) {
       // required, make optional
-      SetSpawnStatus(id, Spawn_Optional, GetSpawnList(true), GetSpawnList(false));
+      SetSpawnStatus(id, Spawn_Optional, GetSpawnList(client, true), GetSpawnList(client, false));
       Executes_MessageToAll("Made spawn \"%s\" optional in execute.", g_SpawnNames[index]);
 
     } else {
       // optional, make not in use
-      SetSpawnStatus(id, Spawn_NotUsed, GetSpawnList(true), GetSpawnList(false));
+      SetSpawnStatus(id, Spawn_NotUsed, GetSpawnList(client, true), GetSpawnList(client,false));
       Executes_MessageToAll("Removed spawn \"%s\" from execute.", g_SpawnNames[index]);
     }
 
@@ -524,24 +528,25 @@ public int GiveExecuteMenuHandler(Menu menu, MenuAction action, int param1, int 
     GetMenuItem(menu, param2, id, sizeof(id));
     int execute = ExecuteIdToIndex(id);
 
-    g_TempNameBuffer = g_ExecuteNames[execute];
-    g_EditingAnExecute = true;
-    g_EditingExecuteIndex = execute;
-    g_EditingExecuteSite = g_ExecuteSites[execute];
-    g_EditingExecuteLikelihood = g_ExecuteLikelihood[execute];
+    //g_TempNameBuffer = g_ExecuteNames[execute];
+    g_EditingNameBuffer[client] = g_ExecuteNames[execute];
+    g_EditingAnExecute[client] = true;
+    g_EditingExecuteIndex[client] = execute;
+    g_EditingExecuteSite[client] = g_ExecuteSites[execute];
+    g_EditingExecuteLikelihood[client] = g_ExecuteLikelihood[execute];
 
-    g_EditingExecuteTRequired.Clear();
-    g_EditingExecuteTOptional.Clear();
-    CopyList(g_ExecuteTSpawnsRequired[execute], g_EditingExecuteTRequired);
-    CopyList(g_ExecuteTSpawnsOptional[execute], g_EditingExecuteTOptional);
-    strcopy(g_EditingExecuteForceBombId, ID_LENGTH, g_ExecuteForceBombId[execute]);
-    g_EditingExecuteStratTypes = g_ExecuteStratTypes[execute];
+    g_EditingExecuteTRequired[client].Clear();
+    g_EditingExecuteTOptional[client].Clear();
+    CopyList(g_ExecuteTSpawnsRequired[execute], g_EditingExecuteTRequired[client]);
+    CopyList(g_ExecuteTSpawnsOptional[execute], g_EditingExecuteTOptional[client]);
+    strcopy(g_EditingExecuteForceBombId[client], ID_LENGTH, g_ExecuteForceBombId[execute]);
+    g_EditingExecuteStratTypes[client] = g_ExecuteStratTypes[execute];
 
     GiveNewExecuteMenu(client);
 
   } else if (action == MenuAction_Cancel && param2 == MenuCancel_ExitBack) {
-    g_EditingAnExecute = false;
     int client = param1;
+    g_EditingAnExecute[client] = false;
     GiveNewExecuteMenu(client);
   } else if (action == MenuAction_End) {
     delete menu;
@@ -592,7 +597,7 @@ public int GiveEditSpawnChoiceMenuHandler(Menu menu, MenuAction action, int para
   } else if (action == MenuAction_Cancel && param2 == MenuCancel_ExitBack) {
     int client = param1;
     GiveEditorMenu(client);
-    g_EditingASpawn = false;
+    g_EditingASpawn[client] = false;
 
   } else if (action == MenuAction_End) {
     delete menu;
@@ -601,20 +606,21 @@ public int GiveEditSpawnChoiceMenuHandler(Menu menu, MenuAction action, int para
 
 public void EditSpawn(int client, int spawn) {
   MoveToSpawnInEditor(client, spawn);
-  g_TempNameBuffer = g_SpawnNames[spawn];
-  g_EditingSpawnTeam = g_SpawnTeams[spawn];
-  g_EditingSpawnGrenadeType = g_SpawnGrenadeTypes[spawn];
-  g_EditingSpawnNadePoint = g_SpawnNadePoints[spawn];
-  g_EditingSpawnNadeVelocity = g_SpawnNadeVelocities[spawn];
-  g_EditingSpawnSiteFriendly = g_SpawnSiteFriendly[spawn];
-  g_EditingSpawnAwpFriendly = g_SpawnAwpFriendly[spawn];
-  g_EditingSpawnBombFriendly = g_SpawnBombFriendly[spawn];
-  g_EditingSpawnLikelihood = g_SpawnLikelihood[spawn];
-  g_EditingSpawnThrowTime = g_SpawnGrenadeThrowTimes[spawn];
-  g_EditingSpawnFlags = g_SpawnFlags[spawn];
+  //g_TempNameBuffer = g_SpawnNames[spawn];
+  g_EditingNameBuffer[client] = g_SpawnNames[spawn];
+  g_EditingSpawnTeam[client] = g_SpawnTeams[spawn];
+  g_EditingSpawnGrenadeType[client] = g_SpawnGrenadeTypes[spawn];
+  g_EditingSpawnNadePoint[client] = g_SpawnNadePoints[spawn];
+  g_EditingSpawnNadeVelocity[client] = g_SpawnNadeVelocities[spawn];
+  g_EditingSpawnSiteFriendly[client] = g_SpawnSiteFriendly[spawn];
+  g_EditingSpawnAwpFriendly[client] = g_SpawnAwpFriendly[spawn];
+  g_EditingSpawnBombFriendly[client] = g_SpawnBombFriendly[spawn];
+  g_EditingSpawnLikelihood[client] = g_SpawnLikelihood[spawn];
+  g_EditingSpawnThrowTime[client] = g_SpawnGrenadeThrowTimes[spawn];
+  g_EditingSpawnFlags[client] = g_SpawnFlags[spawn];
 
-  g_EditingASpawn = true;
-  g_EditingSpawnIndex = spawn;
+  g_EditingASpawn[client] = true;
+  g_EditingSpawnIndex[client] = spawn;
   GiveNewSpawnMenu(client);
 }
 
@@ -624,26 +630,26 @@ public void GiveEditFlagsMenu(int client) {
   menu.ExitButton = true;
   menu.ExitBackButton = true;
 
-  AddFlag(menu, SPAWNFLAG_MOLOTOV, "molotov");
-  AddFlag(menu, SPAWNFLAG_FLASH, "flash");
-  AddFlag(menu, SPAWNFLAG_SMOKE, "smoke");
+  AddFlag(menu, client, SPAWNFLAG_MOLOTOV, "molotov");
+  AddFlag(menu, client, SPAWNFLAG_FLASH, "flash");
+  AddFlag(menu, client, SPAWNFLAG_SMOKE, "smoke");
 
-  AddFlag(menu, SPAWNFLAG_MAG7, "mag7", CS_TEAM_CT);
-  AddFlag(menu, SPAWNFLAG_ALURKER, "A lurker", CS_TEAM_T);
-  AddFlag(menu, SPAWNFLAG_BLURKER, "B lurker", CS_TEAM_T);
+  AddFlag(menu, client, SPAWNFLAG_MAG7, "mag7", CS_TEAM_CT);
+  AddFlag(menu, client, SPAWNFLAG_ALURKER, "A lurker", CS_TEAM_T);
+  AddFlag(menu, client, SPAWNFLAG_BLURKER, "B lurker", CS_TEAM_T);
 
   menu.Display(client, MENU_TIME_FOREVER);
 }
 
-static void AddFlag(Menu menu, int flag, const char[] title, int team = -1) {
+static void AddFlag(Menu menu, int client, int flag, const char[] title, int team = -1) {
   char tmp[16] = "enabled";
-  if (g_EditingSpawnFlags & flag == 0) {
+  if (g_EditingSpawnFlags[client] & flag == 0) {
     tmp = "disabled";
   }
   char display[64];
   Format(display, sizeof(display), "%s: %s", title, tmp);
 
-  if (team == -1 || g_EditingSpawnTeam == team) {
+  if (team == -1 || g_EditingSpawnTeam[client] == team) {
     AddMenuInt(menu, flag, display);
   }
 }
@@ -653,12 +659,12 @@ public int EditFlagsHandler(Menu menu, MenuAction action, int param1, int param2
     int client = param1;
     int flagMask = GetMenuInt(menu, param2);
 
-    if (g_EditingSpawnFlags & flagMask == 0) {
+    if (g_EditingSpawnFlags[client] & flagMask == 0) {
       // Enabled the flag
-      g_EditingSpawnFlags |= flagMask;
+      g_EditingSpawnFlags[client] |= flagMask;
     } else {
       // Disable the flag
-      g_EditingSpawnFlags &= ~flagMask;
+      g_EditingSpawnFlags[client] &= ~flagMask;
     }
 
     GiveEditFlagsMenu(client);
